@@ -34,10 +34,11 @@
 	
 	        <Button
 	            android:id="@+id/btn_analyze"
+				style="@style/ButtonText"
+				android:background="@drawable/btn_blue"
 	            android:layout_width="wrap_content"
 	            android:layout_height="wrap_content"
-	            android:text="@string/analyze"
-	            android:textSize="15sp" />
+	            android:text="@string/analyze" />
 	    </LinearLayout>
 	
 	    <LinearLayout
@@ -126,6 +127,8 @@
 	
 	    <Button
 	        android:id="@+id/btn_download"
+	        style="@style/ButtonText"
+			android:background="@drawable/btn_blue"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
 	        android:layout_below="@id/page_info"
