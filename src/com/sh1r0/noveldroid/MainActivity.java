@@ -3,8 +3,6 @@ package com.sh1r0.noveldroid;
 import java.io.File;
 import java.lang.reflect.Field;
 
-import com.sh1r0.noveldroid.downloader.AbstractDownloader;
-
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
@@ -44,6 +42,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnKeyListener;
 import android.view.WindowManager;
+import android.view.animation.TranslateAnimation;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -51,11 +50,14 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.sh1r0.noveldroid.downloader.AbstractDownloader;
 
 public class MainActivity extends ActionBarActivity implements AdapterView.OnItemClickListener {
 	private static final int SUCCESS = 0x10000;
@@ -83,6 +85,8 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 	private DrawerLayout mDrawerLayout;
 	private ListView mDrawerList;
 	private ActionBarDrawerToggle mDrawerToggle;
+	private FrameLayout contentFrame;
+	private float lastTranslate = 0.0f;
 	private Novel novel;
 	private AbstractDownloader novelDownloader;
 
@@ -106,9 +110,8 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 		spnDomain = (Spinner) findViewById(R.id.spn_doamin);
 		pbDownload = (ProgressBar) findViewById(R.id.progressbar);
 
-		ArrayAdapter<String> spnAdapter = new ArrayAdapter<String>(this,
-				android.R.layout.simple_spinner_item, this.getResources().getStringArray(
-						R.array.domain));
+		ArrayAdapter<String> spnAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, this
+				.getResources().getStringArray(R.array.domain));
 		spnAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 		spnDomain.setAdapter(spnAdapter);
 
@@ -119,8 +122,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 				btnDownload.setEnabled(false);
 
 				if (!isNetworkConnected()) {
-					Toast.makeText(getApplicationContext(), R.string.no_connection_tooltip,
-							Toast.LENGTH_SHORT).show();
+					Toast.makeText(getApplicationContext(), R.string.no_connection_tooltip, Toast.LENGTH_SHORT).show();
 					return;
 				}
 
@@ -131,8 +133,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 				}
 
 				try {
-					novelDownloader = DownloaderFactory.getDownloader(spnDomain
-							.getSelectedItemPosition());
+					novelDownloader = DownloaderFactory.getDownloader(spnDomain.getSelectedItemPosition());
 					if ((novel = novelDownloader.analyze(tid)) == null) {
 						throw new Exception();
 					}
@@ -147,8 +148,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 				etFromPage.setText(String.valueOf(novel.fromPage));
 				etToPage.setText(String.valueOf(novel.toPage));
 
-				Toast.makeText(getApplicationContext(), R.string.analysis_done_tooltip,
-						Toast.LENGTH_SHORT).show();
+				Toast.makeText(getApplicationContext(), R.string.analysis_done_tooltip, Toast.LENGTH_SHORT).show();
 				btnDownload.setEnabled(true);
 			}
 		});
@@ -165,12 +165,11 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 					dialog.setTitle(R.string.error_dialog_title);
 					dialog.setMessage(R.string.empty_name_dialog_msg);
 					dialog.setCancelable(false);
-					dialog.setPositiveButton(R.string.ok_btn,
-							new DialogInterface.OnClickListener() {
-								@Override
-								public void onClick(DialogInterface dialog, int which) {
-								}
-							});
+					dialog.setPositiveButton(R.string.ok_btn, new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+						}
+					});
 					dialog.show();
 					return;
 				}
@@ -178,8 +177,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 				try {
 					novel.fromPage = Integer.parseInt(etFromPage.getText().toString());
 					novel.toPage = Integer.parseInt(etToPage.getText().toString());
-					if (novel.fromPage < 1 || novel.fromPage > novel.toPage
-							|| novel.toPage > novel.lastPage) {
+					if (novel.fromPage < 1 || novel.fromPage > novel.toPage || novel.toPage > novel.lastPage) {
 						throw new NumberFormatException();
 					}
 				} catch (NumberFormatException e) {
@@ -188,12 +186,11 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 					dialog.setTitle(R.string.error_dialog_title);
 					dialog.setMessage(R.string.wrong_page_dialog_msg);
 					dialog.setCancelable(false);
-					dialog.setPositiveButton(R.string.ok_btn,
-							new DialogInterface.OnClickListener() {
-								@Override
-								public void onClick(DialogInterface dialog, int which) {
-								}
-							});
+					dialog.setPositiveButton(R.string.ok_btn, new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+						}
+					});
 					dialog.show();
 					return;
 				}
@@ -237,6 +234,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 		mDrawerList = (ListView) findViewById(R.id.left_drawer);
 		mDrawerList.setAdapter(new DrawerItemAdapter(this, R.layout.drawer_list_item, menu));
 		mDrawerList.setOnItemClickListener(this);
+		contentFrame = (FrameLayout) findViewById(R.id.content_frame);
 
 		mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout, R.drawable.ic_drawer, 0, 0) {
 			@Override
@@ -247,6 +245,23 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 			@Override
 			public void onDrawerOpened(View drawerView) {
 				supportInvalidateOptionsMenu();
+			}
+
+			@TargetApi(Build.VERSION_CODES.HONEYCOMB)
+			@Override
+			public void onDrawerSlide(View drawerView, float slideOffset) {
+				float moveFactor = (mDrawerList.getWidth() * slideOffset);
+
+				if (API_VERSION >= Build.VERSION_CODES.HONEYCOMB) {
+					contentFrame.setTranslationX(moveFactor);
+				} else {
+					TranslateAnimation anim = new TranslateAnimation(lastTranslate, moveFactor, 0.0f, 0.0f);
+					anim.setDuration(0);
+					anim.setFillAfter(true);
+					contentFrame.startAnimation(anim);
+
+					lastTranslate = moveFactor;
+				}
 			}
 		};
 		mDrawerLayout.setDrawerListener(mDrawerToggle);
@@ -334,23 +349,20 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 			switch (msg.what) {
 				case SUCCESS:
 					progressDialog.dismiss();
-					Toast.makeText(getApplicationContext(), R.string.download_success_tooltip,
-							Toast.LENGTH_LONG).show();
-					tvStatus.setText(filename + " "
-							+ getResources().getString(R.string.novel_saved_tooltip));
+					Toast.makeText(getApplicationContext(), R.string.download_success_tooltip, Toast.LENGTH_LONG)
+							.show();
+					tvStatus.setText(filename + " " + getResources().getString(R.string.novel_saved_tooltip));
 
 					Intent intent = new Intent(Intent.ACTION_VIEW);
 					Uri uri = Uri.fromFile(new File(downDirPath + filename));
 					intent.setDataAndType(uri, "text/plain");
 					String ticker = filename + " " + getString(R.string.novel_saved_tooltip);
 
-					NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
-							MainActivity.this).setContentTitle(getString(R.string.app_name))
-							.setContentText(downDirPath + filename).setTicker(ticker)
-							.setSmallIcon(android.R.drawable.stat_sys_download_done)
+					NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(MainActivity.this)
+							.setContentTitle(getString(R.string.app_name)).setContentText(downDirPath + filename)
+							.setTicker(ticker).setSmallIcon(android.R.drawable.stat_sys_download_done)
 							.setAutoCancel(true);
-					PendingIntent contentIntent = PendingIntent.getActivity(MainActivity.this, 0,
-							intent, 0);
+					PendingIntent contentIntent = PendingIntent.getActivity(MainActivity.this, 0, intent, 0);
 					mBuilder.setContentIntent(contentIntent);
 					mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 					mNotificationManager.notify(0, mBuilder.build());
@@ -359,15 +371,14 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 				case PREPARING:
 					pbDownload.setVisibility(View.GONE);
 					tvDownloadStatus.setVisibility(View.GONE);
-					progressDialog = ProgressDialog.show(MainActivity.this, getResources()
-							.getString(R.string.progress_dialog_title),
+					progressDialog = ProgressDialog.show(MainActivity.this,
+							getResources().getString(R.string.progress_dialog_title),
 							getResources().getString(R.string.progress_dialog_msg));
 					break;
 				case FAIL:
 					if (progressDialog != null && progressDialog.isShowing())
 						progressDialog.dismiss();
-					Toast.makeText(getApplicationContext(), R.string.download_fail_tooltip,
-							Toast.LENGTH_SHORT).show();
+					Toast.makeText(getApplicationContext(), R.string.download_fail_tooltip, Toast.LENGTH_SHORT).show();
 					tvStatus.setText(R.string.download_fail_msg);
 					break;
 			}
@@ -440,7 +451,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 	@SuppressWarnings("deprecation")
 	private int getScreenWidth() {
 		Display display = getWindowManager().getDefaultDisplay();
-		if (API_VERSION >= 13) {
+		if (API_VERSION >= Build.VERSION_CODES.HONEYCOMB_MR2) {
 			Point size = new Point();
 			display.getSize(size);
 			width = size.x;
